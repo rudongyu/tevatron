@@ -63,23 +63,22 @@ def main():
     index_files = glob.glob(args.passage_reps)
     logger.info(f'Pattern match found {len(index_files)} files; loading them into index.')
 
-    p_reps_0, p_lookup_0 = pickle_load(index_files[0])
-    retriever = FaissFlatSearcher(p_reps_0)
-
-    shards = chain([(p_reps_0, p_lookup_0)], map(pickle_load, index_files[1:]))
-    if len(index_files) > 1:
-        shards = tqdm(shards, desc='Loading shards into index', total=len(index_files))
-    look_up = []
-    for p_reps, p_lookup in shards:
-        retriever.add(p_reps)
-        look_up += p_lookup
-
     q_reps, q_lookup = pickle_load(args.query_reps)
-    q_reps = q_reps
 
-    logger.info('Index Search Start')
-    all_scores, psg_indices = search_queries(retriever, q_reps, look_up, args)
-    logger.info('Index Search Finished')
+    all_scores, all_indices = [], []
+    for index_file in tqdm(index_files, desc=f"searching"):
+        p_reps, p_lookup = pickle_load(index_file)
+        retriever = FaissFlatSearcher(p_reps)
+        retriever.add(p_reps)
+        scores, indices = search_queries(retriever, q_reps, p_lookup, args)
+        all_scores.append(scores)
+        all_indices.append(indices)
+    all_scores = np.concatenate(all_scores, axis=1)
+    psg_indices = np.concatenate(all_indices, axis=1)
+
+    resort_indices = np.argsort(-all_scores, axis=1)[:, :args.depth]
+    all_scores = np.take_along_axis(all_scores, resort_indices, axis=1)
+    psg_indices = np.take_along_axis(psg_indices, resort_indices, axis=1)
 
     if args.save_text:
         write_ranking(psg_indices, all_scores, q_lookup, args.save_ranking_to)

@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig
 from transformers import (
     HfArgumentParser,
     set_seed,
@@ -67,10 +67,18 @@ def main():
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     tokenizer.padding_side = 'right'
+
+    # num_labels = 1
+    config = AutoConfig.from_pretrained(
+        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+        # num_labels=num_labels,
+        cache_dir=model_args.cache_dir,
+    )
     
     model = DenseModel.build(
         model_args,
         training_args,
+        config=config,
         cache_dir=model_args.cache_dir,
     )
 
